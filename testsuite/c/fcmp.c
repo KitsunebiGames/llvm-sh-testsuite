@@ -28,21 +28,21 @@ int test_z2() { return z(1); }
 int test_nz1() { return nz(1); }
 int test_nz2() { return nz(0); }
 
-// XRUN: test_eq1 = 1
-// XRUN: test_eq2 = 0
-// XRUN: test_ne1 = 1
-// XRUN: test_ne2 = 0
-// XRUN: test_gt1 = 1
-// XRUN: test_gt2 = 0
-// XRUN: test_ge1 = 1
-// XRUN: test_ge2 = 1
-// XRUN: test_ge3 = 0
-// XRUN: test_lt1 = 1
-// XRUN: test_lt2 = 0
-// XRUN: test_le1 = 1
-// XRUN: test_le2 = 1
-// XRUN: test_le3 = 0
-// XRUN: test_z1 = 1
-// XRUN: test_z2 = 0
-// XRUN: test_nz1 = 1
-// XRUN: test_nz2 = 0
+// SKIP: test_eq1 = 1
+// SKIP: test_eq2 = 0
+// SKIP: test_ne1 = 1
+// SKIP: test_ne2 = 0
+// SKIP: test_gt1 = 1
+// SKIP: test_gt2 = 0
+// SKIP: test_ge1 = 1
+// SKIP: test_ge2 = 1
+// SKIP: test_ge3 = 0
+// SKIP: test_lt1 = 1
+// SKIP: test_lt2 = 0
+// SKIP: test_le1 = 1
+// SKIP: test_le2 = 1
+// SKIP: test_le3 = 0
+// SKIP: test_z1 = 1
+// SKIP: test_z2 = 0
+// SKIP: test_nz1 = 1
+// SKIP: test_nz2 = 0

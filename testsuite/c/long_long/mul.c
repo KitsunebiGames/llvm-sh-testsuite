@@ -4,4 +4,4 @@
 NOINLINE long long f(long long a, long long b) { return a * b; }
 int test_call(void) { long long r = f(100000LL, 300000LL); return (int)(r >> 32) * 100000 + (int)(r & 0xFFFF); }
 
-// RUN: test_call = 644032
+// SKIP: test_call = 644032

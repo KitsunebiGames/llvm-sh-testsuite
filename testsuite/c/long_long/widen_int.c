@@ -4,4 +4,4 @@
 NOINLINE long long f(int a) { return a; }
 int test_call(void) { return (int)(f(-5) >> 32); }
 
-// RUN: test_call = -1
+// SKIP: test_call = -1

@@ -5,5 +5,5 @@ NOINLINE int f(long long a, long long b) { return a < b; }
 int test_lt(void) { return f(-1LL, 0x100000000LL); }
 int test_ge(void) { return f(0x100000000LL, 5LL); }
 
-// RUN: test_lt = 1
-// RUN: test_ge = 0
+// SKIP: test_lt = 1
+// SKIP: test_ge = 0

@@ -60,10 +60,6 @@ if args.debug:
 TIMEOUT = args.timeout
 COMPILE_TIMEOUT = args.compile_timeout
 
-def exec_sheval(file, fn):
-	proc = subprocess.run([SHEVAL_PATH, file, "-e", fn], stdout=subprocess.PIPE, timeout=TIMEOUT, encoding='utf-8')
-	return proc.stdout
-
 def dump_asm(file):
 	proc = subprocess.run([OBJDUMP_PATH, "-m", "sh4", "--disassemble", "--disassembler-color=extended", file], stdout=subprocess.PIPE, encoding='utf-8')
 	print(proc.stdout, end='')
@@ -93,25 +89,126 @@ def print_seperator(title):
 		print('=', end='')
 		i += 1
 
+TEST_FAIL = 0
+TEST_PASS = 1
+TEST_SKIP = 2
+TEST_TIMEOUT = 3
 
+# An indvidual test within a test bundle.
+class Test:
+	def __init__(self, file, name, expected, type):
+		self.file = file
+		self.name = name
+		self.expected = expected
+		self.type = type
+
+	@staticmethod
+	def parse(file, teststr):
+		if not teststr.startswith("//"):
+			return None
+		
+		# Run and expect success.
+		line = consume_whitespace(teststr[2:])
+		if line.startswith("RUN:"):
+			line = consume_whitespace(line[4:])
+			sides = line.split('=')
+			lhs = consume_whitespace(sides[0])
+			rhs = consume_whitespace(sides[1])
+			return Test(file, lhs, rhs, "RUN")
+
+		# Run and expect failure.
+		if line.startswith("FAIL:"):
+			line = consume_whitespace(line[4:])
+			sides = line.split('=')
+			lhs = consume_whitespace(sides[0])
+			rhs = consume_whitespace(sides[1])
+			return Test(file, lhs, rhs, "FAIL")
+
+		# Do not run
+		if line.startswith("SKIP:"):
+			line = consume_whitespace(line[4:])
+			sides = line.split('=')
+			lhs = consume_whitespace(sides[0])
+			rhs = consume_whitespace(sides[1])
+			return Test(file, lhs, rhs, "SKIP")
+
+		return None
+
+	# The core sheval execution function
+	def exec(self, obj, timeout):
+		proc = subprocess.run([SHEVAL_PATH, obj.name, "-e", self.name], stdout=subprocess.PIPE, timeout=timeout, encoding='utf-8')
+		return proc.stdout.strip()
+
+	# Runs the test, returning true if it succeeded,
+	# false if it failed, raises an Exception if it
+	# failed due to timeout.
+	def run(self, obj, timeout):
+		print(f"    {self.name}: ", end='', flush=True)
+		match self.type:
+			case "SKIP":
+				print("\033[1;33mSKIPPED\033[0m")
+				return TEST_SKIP
+
+			case "RUN":
+				try:
+					res = self.exec(obj, timeout)
+					if res == self.expected:
+						print("\033[0;32mPASSED\033[0m")
+						return TEST_PASS
+					else:
+						print(f"\033[0;31mFAILED\033[0m (expected {self.expected}, got {res})")
+						return TEST_FAIL
+
+				except subprocess.TimeoutExpired as ex:
+					print("\033[1;33mTIMEOUT\033[0m")
+					return TEST_TIMEOUT
+
+				return TEST_FAIL
+
+			case "FAIL":
+				try:
+					res = self.exec(obj, timeout)
+					if res != self.expected:
+						print("\033[0;32mFAILED\033[0m (expected)")
+						return TEST_PASS
+					else:
+						print(f"\033[0;31mPASSED\033[0m (unexpected)")
+						return TEST_FAIL
+
+				except subprocess.TimeoutExpired as ex:
+					print("\033[1;33mTIMEOUT\033[0m")
+					return TEST_TIMEOUT
+
+				return TEST_FAIL
+
+			case _:
+				print(f"\033[0;31mFAILED\033[0m (unknown test type {self.type})")
+				return TEST_FAIL
+
+
+
+# A test file bundle
 class TestFile:
 	def __init__(self, file):
 		self.file = file;
 		self.category = Path(file).parent.relative_to("testsuite").as_posix()
 		self.f = open(file, "r", encoding="utf-8")
-		self.tests: list[tuple[str, str]] = []
+		self.tests: list[Test] = []
 		
 		# Parse test strings.
 		for line in self.f:
 			if line.startswith("//"):
-				line = consume_whitespace(line[2:])
-				if line.startswith("RUN:"):
-					line = consume_whitespace(line[4:])
-					sides = line.split('=')
-					lhs = consume_whitespace(sides[0])
-					rhs = consume_whitespace(sides[1])
-					self.tests.append((lhs, rhs))
+				ntest = Test.parse(self, line)
+				if ntest != None:
+					self.tests.append(ntest)
 
+	def skips_all(self):
+		skipc = 0
+		for test in self.tests:
+			if test.type == "SKIP":
+				skipc += 1
+
+		return skipc == len(self.tests)
 
 
 	# Compiles a test file.
@@ -155,47 +252,47 @@ class TestFile:
 			finally:
 				os.remove(obj.name)
 
-	def run_tests(self):
-		passed = 0
-		failed = 0
-		timedout = 0
+	def run_tests(self) -> list[int]:
+		results: list[int] = [0, 0, 0, 0]
+
+		# Skip compilation if unneccesary.
+		if self.skips_all():
+			for test in self.tests:
+				res = test.run(None, TIMEOUT)
+				results[res] += 1
+			return results
+
 		try:
 			obj = self.compile()
+
 		except subprocess.TimeoutExpired as ex:
 			print(f"\033[0;31mERROR\033[0m: failed to compile!\n")
 			if ex.stderr:
 				print_seperator("ERROR LOG")
-				print(ex.stderr.decode('utf-8'), end='', flush=True)
+				print("\n"+ex.stderr.decode('utf-8'), end='', flush=True)
 				print_seperator("")
-			return (0, len(self.tests), 0)
+			results[TEST_FAIL] = len(self.tests)
+			return results
+
 		except Exception as ex:
 			print(f"\033[0;31mERROR\033[0m: failed to compile or link!")
 			if len(str(ex)) > 0:
 				print(str(ex).rstrip())
-			return (0, len(self.tests), 0)
+
+			results[TEST_FAIL] = len(self.tests)
+			return results
 
 		for test in self.tests:
-			print(f"    {test[0]}: ", end='', flush=True)
-			try:
-				res = exec_sheval(obj.name, test[0]).strip()
-				if res == test[1]:
-					print("\033[0;32mSUCCESS\033[0m")
-					passed += 1
-				else:
-					print(f"\033[0;31mFAILURE\033[0m (expected {test[1]}, got {res})")
-					failed += 1
+			res = test.run(obj, TIMEOUT)
+			results[res] += 1
 
-			except subprocess.TimeoutExpired:
-				print("\033[1;33mTIMEOUT\033[0m")
-				timedout += 1
-
-		if (failed > 0 or timedout > 0) and DUMP_ASM:
+		if (results[TEST_FAIL] > 0 or results[TEST_TIMEOUT] > 0) and DUMP_ASM:
 			print_seperator("ASSEMBLY")
 			dump_asm(obj.name)
 			print_seperator("")
 
 		os.remove(obj.name)
-		return (passed, failed, timedout)
+		return results
 
 
 class Tee:
@@ -231,19 +328,21 @@ for f in ALL_TESTS:
 		TESTS.append(tf)
 		TOTAL += len(tf.tests)
 
+if TOTAL == 0:
+	print("No tests to run...")
+	quit()
+
 # Group the tests by category (the folder they're in, e.g. c/matrix).
 CATEGORIES: dict[str, list[TestFile]] = {}
 for test in TESTS:
 	CATEGORIES.setdefault(test.category, []).append(test)
 
-PASSED = 0
-FAILED = 0
-TIMEDOUT = 0
+RESULTS: list[int] = [0, 0, 0, 0]
 SUMMARY = []
 Path("results").mkdir(exist_ok=True)
 print(f"Running {TOTAL} tests...")
 for category, tests in CATEGORIES.items():
-	cat_passed = cat_failed = cat_timedout = 0
+	cat_passed = cat_failed = cat_timedout = cat_skipped = 0
 	log = io.StringIO()
 	with contextlib.redirect_stdout(Tee(sys.stdout, log)):
 		print("")
@@ -253,32 +352,38 @@ for category, tests in CATEGORIES.items():
 			print("")
 			print(f"{test.file} ({len(test.tests)} tests): ")
 			res = test.run_tests()
-			cat_passed += res[0]
-			cat_failed += res[1]
-			cat_timedout += res[2]
-		print(f"\n{category}: {cat_passed} passed, {cat_failed} failed, {cat_timedout} timed out")
+			cat_failed += res[TEST_FAIL]
+			cat_passed += res[TEST_PASS]
+			cat_skipped += res[TEST_SKIP]
+			cat_timedout += res[TEST_TIMEOUT]
+		print(f"\n{category}: {cat_passed} passed, {cat_failed} failed, {cat_skipped} skipped, {cat_timedout} timed out")
 
 	# Save this category's results, without colour codes.
 	text = re.sub(r"\033\[[0-9;]*m", "", log.getvalue())
 	Path("results", category.replace("/", "_") + ".txt").write_text(text.lstrip("\n"), encoding="utf-8")
-	SUMMARY.append((category, cat_passed, cat_failed, cat_timedout))
-	PASSED += cat_passed
-	FAILED += cat_failed
-	TIMEDOUT += cat_timedout
+	SUMMARY.append((category, cat_passed, cat_failed, cat_skipped, cat_timedout))
+	RESULTS[TEST_FAIL] += cat_failed
+	RESULTS[TEST_PASS] += cat_passed
+	RESULTS[TEST_SKIP] += cat_skipped
+	RESULTS[TEST_TIMEOUT] += cat_timedout
 
 # Colours a count (already padded) if it's non-zero.
 def colour(text, count, code):
 	return f"{code}{text}\033[0m" if count > 0 else text
 
-def summary_row(category, passed, failed, timedout, colours):
+def summary_row(category, passed, failed, skipped, timedout, colours):
 	if not colours:
-		return f"{category:<20} {passed:>7} {failed:>7} {timedout:>10}"
+		return f"{category:<20} {passed:>7} {failed:>7} {skipped:>8} {timedout:>10}"
 	# The category name is green if everything in it passed, red otherwise.
 	name = f"\033[0;32m{category:<20}\033[0m" if failed == 0 and timedout == 0 else f"\033[0;31m{category:<20}\033[0m"
-	return (name + " " + colour(f"{passed:>7}", passed, "\033[0;32m") + " "
-		+ colour(f"{failed:>7}", failed, "\033[0;31m") + " " + colour(f"{timedout:>10}", timedout, "\033[1;33m"))
+	return (name + 
+		" " + colour(f"{passed:>7}", passed, "\033[0;32m") + 
+		" " + colour(f"{failed:>7}", failed, "\033[0;31m") + 
+		" " + colour(f"{skipped:>8}", skipped, "\033[1;33m") +
+		" " + colour(f"{timedout:>10}", timedout, "\033[1;33m") 
+	)
 
-header = f"{'CATEGORY':<20} {'PASSED':>7} {'FAILED':>7} {'TIMED OUT':>10}"
+header = f"{'CATEGORY':<20} {'PASSED':>7} {'FAILED':>7} {'SKIPPED':>8} {'TIMED OUT':>10}"
 summary = "\n".join([header] + [summary_row(*row, False) for row in SUMMARY])
 Path("results", "summary.txt").write_text(f"OPT={OPT}\n\n{summary}\n", encoding="utf-8")
 print("")
@@ -288,7 +393,14 @@ print(header)
 for row in SUMMARY:
 	print(summary_row(*row, True))
 
-print(f"\nPASSED:\t\t" + colour(str(PASSED), PASSED, "\033[0;32m"))
-print(f"FAILED:\t\t" + colour(str(FAILED), FAILED, "\033[0;31m"))
-print(f"TIMED OUT:\t" + colour(str(TIMEDOUT), TIMEDOUT, "\033[1;33m"))
+COVERAGE = int((float(RESULTS[TEST_PASS]+RESULTS[TEST_SKIP]) / float(TOTAL)) * 100)
+
+print("")
+print_seperator("TOTAL")
+print(f"\nPASSED:\t\t" + colour(str(RESULTS[TEST_PASS]), RESULTS[TEST_PASS], "\033[0;32m"))
+print(f"SKIPPED:\t" + colour(str(RESULTS[TEST_SKIP]), RESULTS[TEST_SKIP], "\033[1;33m"))
+print(f"FAILED:\t\t" + colour(str(RESULTS[TEST_FAIL]), RESULTS[TEST_FAIL], "\033[0;31m"))
+print(f"TIMED OUT:\t" + colour(str(RESULTS[TEST_TIMEOUT]), RESULTS[TEST_TIMEOUT], "\033[1;33m"))
 print("\nResults for each category are in results/")
+print("")
+print(f"Coverage %:\t{COVERAGE}%");

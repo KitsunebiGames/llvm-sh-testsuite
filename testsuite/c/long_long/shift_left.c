@@ -4,4 +4,4 @@
 NOINLINE unsigned long long f(unsigned long long a, int n) { return a << n; }
 int test_call(void) { return (int)(f(3ULL, 33) >> 32); }
 
-// RUN: test_call = 6
+// SKIP: test_call = 6

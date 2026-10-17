@@ -1,0 +1,12 @@
+/* Inequality comparison of two int values controlling an if/else. */
+#include "test.h"
+
+NOINLINE int f(int a, int b) { if (a != b) return 10; return 20; }
+
+int test_lo_hi(void) { return f(-2000000000, 2000000000); }
+int test_hi_lo(void) { return f(2000000000, -2000000000); }
+int test_equal(void) { return f(2000000000, 2000000000); }
+
+// RUN: test_lo_hi = 10
+// RUN: test_hi_lo = 10
+// RUN: test_equal = 20

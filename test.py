@@ -219,7 +219,7 @@ class TestFile:
 		with tempfile.NamedTemporaryFile(suffix=".o", delete=False) as obj:
 			obj.close()
 			if self.file.endswith(".c"):
-				args = [CLANG_PATH, "-nostdlib", "-ffreestanding", "-Itestsuite/c", f"--target={ARCH}", f"-O{OPT}", "-c", self.file, "-o", obj.name]
+				args = [CLANG_PATH, "-nostdlib", "-ffreestanding", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-c", self.file, "-o", obj.name]
 				if len(LL_DEBUG) != 0:
 					args.append(f"-mllvm={LL_DEBUG}")
 

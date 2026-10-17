@@ -261,19 +261,22 @@ for category, tests in CATEGORIES.items():
 	# Save this category's results, without colour codes.
 	text = re.sub(r"\033\[[0-9;]*m", "", log.getvalue())
 	Path("results", category.replace("/", "_") + ".txt").write_text(text.lstrip("\n"), encoding="utf-8")
-	SUMMARY.append(f"{category:<20} {cat_passed:>7} {cat_failed:>7} {cat_timedout:>10}")
+	SUMMARY.append((f"{category:<20} {cat_passed:>7} {cat_failed:>7} {cat_timedout:>10}", cat_failed == 0 and cat_timedout == 0))
 	PASSED += cat_passed
 	FAILED += cat_failed
 	TIMEDOUT += cat_timedout
 
-summary = "\n".join([f"{'CATEGORY':<20} {'PASSED':>7} {'FAILED':>7} {'TIMED OUT':>10}"] + SUMMARY)
+header = f"{'CATEGORY':<20} {'PASSED':>7} {'FAILED':>7} {'TIMED OUT':>10}"
+summary = "\n".join([header] + [row for row, _ in SUMMARY])
 Path("results", "summary.txt").write_text(f"OPT={OPT}\n\n{summary}\n", encoding="utf-8")
 print("")
 print_seperator("RESULTS BY CATEGORY")
 print("")
-print(summary)
+print(header)
+for row, ok in SUMMARY:
+	print(f"\033[0;32m{row}\033[0m" if ok else f"\033[0;31m{row}\033[0m")
 
-print(f"\nPASSED:\t\t{PASSED}")
-print(f"FAILED:\t\t{FAILED}")
-print(f"TIMED OUT:\t{TIMEDOUT}")
+print(f"\n\033[0;32mPASSED:\033[0m\t\t{PASSED}")
+print(("\033[0;31m" if FAILED > 0 else "") + f"FAILED:\033[0m\t\t{FAILED}")
+print(("\033[1;33m" if TIMEDOUT > 0 else "") + f"TIMED OUT:\033[0m\t{TIMEDOUT}")
 print("\nResults for each category are in results/")

@@ -261,22 +261,34 @@ for category, tests in CATEGORIES.items():
 	# Save this category's results, without colour codes.
 	text = re.sub(r"\033\[[0-9;]*m", "", log.getvalue())
 	Path("results", category.replace("/", "_") + ".txt").write_text(text.lstrip("\n"), encoding="utf-8")
-	SUMMARY.append((f"{category:<20} {cat_passed:>7} {cat_failed:>7} {cat_timedout:>10}", cat_failed == 0 and cat_timedout == 0))
+	SUMMARY.append((category, cat_passed, cat_failed, cat_timedout))
 	PASSED += cat_passed
 	FAILED += cat_failed
 	TIMEDOUT += cat_timedout
 
+# Colours a count (already padded) if it's non-zero.
+def colour(text, count, code):
+	return f"{code}{text}\033[0m" if count > 0 else text
+
+def summary_row(category, passed, failed, timedout, colours):
+	if not colours:
+		return f"{category:<20} {passed:>7} {failed:>7} {timedout:>10}"
+	# The category name is green if everything in it passed, red otherwise.
+	name = f"\033[0;32m{category:<20}\033[0m" if failed == 0 and timedout == 0 else f"\033[0;31m{category:<20}\033[0m"
+	return (name + " " + colour(f"{passed:>7}", passed, "\033[0;32m") + " "
+		+ colour(f"{failed:>7}", failed, "\033[0;31m") + " " + colour(f"{timedout:>10}", timedout, "\033[1;33m"))
+
 header = f"{'CATEGORY':<20} {'PASSED':>7} {'FAILED':>7} {'TIMED OUT':>10}"
-summary = "\n".join([header] + [row for row, _ in SUMMARY])
+summary = "\n".join([header] + [summary_row(*row, False) for row in SUMMARY])
 Path("results", "summary.txt").write_text(f"OPT={OPT}\n\n{summary}\n", encoding="utf-8")
 print("")
 print_seperator("RESULTS BY CATEGORY")
 print("")
 print(header)
-for row, ok in SUMMARY:
-	print(f"\033[0;32m{row}\033[0m" if ok else f"\033[0;31m{row}\033[0m")
+for row in SUMMARY:
+	print(summary_row(*row, True))
 
-print(f"\n\033[0;32mPASSED:\033[0m\t\t{PASSED}")
-print(("\033[0;31m" if FAILED > 0 else "") + f"FAILED:\033[0m\t\t{FAILED}")
-print(("\033[1;33m" if TIMEDOUT > 0 else "") + f"TIMED OUT:\033[0m\t{TIMEDOUT}")
+print(f"\nPASSED:\t\t" + colour(str(PASSED), PASSED, "\033[0;32m"))
+print(f"FAILED:\t\t" + colour(str(FAILED), FAILED, "\033[0;31m"))
+print(f"TIMED OUT:\t" + colour(str(TIMEDOUT), TIMEDOUT, "\033[1;33m"))
 print("\nResults for each category are in results/")

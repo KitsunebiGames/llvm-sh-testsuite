@@ -10,25 +10,9 @@ import subprocess
 import os
 
 SHEVAL_PATH = "bin/sheval"
-CLANG_PATH = "llvm/bin/clang"
-LDC_PATH = "llvm/bin/ldc2"
-LD_PATH = "llvm/bin/ld.lld"
-OBJDUMP_PATH = "sh-elf-objdump"
+OBJDUMP_PATH = "gcc/bin/sh-elf-objdump"
 ARCH = "sh4el-elf"
 
-# Apply Windows-specific name fixes.
-if os.name == 'nt':
-	SHEVAL_PATH += ".exe"
-	CLANG_PATH += ".exe"
-	LDC_PATH += ".exe"
-	LD_PATH += ".exe"
-	OBJDUMP_PATH += ".exe"
-
-# Windows can't start a program from a relative path with forward slashes.
-SHEVAL_PATH = os.path.abspath(SHEVAL_PATH)
-CLANG_PATH = os.path.abspath(CLANG_PATH)
-LDC_PATH = os.path.abspath(LDC_PATH)
-LD_PATH = os.path.abspath(LD_PATH)
 
 parser = argparse.ArgumentParser(description="Runs the SuperH LLVM backend test suite.")
 parser.add_argument("tests", nargs="*", help="test files to run (default: all)")
@@ -36,19 +20,24 @@ parser.add_argument("-O", dest="opt", type=int, default=0, help="optimisation le
 parser.add_argument("-c", "--category", action="append", default=[],
 	help="only run this category, e.g. c/matrix (can be repeated)")
 parser.add_argument("--dump-asm", action="store_true", help="disassemble programs with failing tests")
+parser.add_argument("--dump-pseudo", action="store_true", help="Dump backend generated pseudo-asm.")
 parser.add_argument("--debug", default="", metavar="TYPES", help="'all' for -debug, otherwise -debug-only=TYPES")
 parser.add_argument("--timeout", type=float, default=5, help="seconds per sheval run (default: 5)")
 parser.add_argument("--compile-timeout", type=float, default=1, help="seconds per compile (default: 1)")
+parser.add_argument("--sanity-check", action="store_true", help="Run a sanity check with sh-elf-gcc")
 args = parser.parse_args()
 
 # OPT LEVEL
 OPT = args.opt
+
+SANITY_CHECK = args.sanity_check
 
 # TESTS TO RUN
 TO_RUN = [Path(t) for t in args.tests]
 
 # DUMP ASM?
 DUMP_ASM = args.dump_asm
+DUMP_PSEUDO = args.dump_pseudo
 
 LL_DEBUG = ""
 if args.debug:
@@ -60,9 +49,69 @@ if args.debug:
 TIMEOUT = args.timeout
 COMPILE_TIMEOUT = args.compile_timeout
 
+
+
+
+
+# Gets the OS-independent tool path for a given posix tool path.
+def get_tool_path(tool):
+	path = Path(tool).absolute()
+	if os.name == 'nt':
+		path = path.with_suffix('.exe')
+	return str(path)
+
+
+def get_tool(lang):
+	match lang:
+		case "C":
+			if SANITY_CHECK:
+				return get_tool_path("gcc/bin/sh-elf-gcc")
+			return get_tool_path("llvm/bin/clang")
+		case "C++":
+			return get_tool_path("llvm/bin/clang++")
+		case "D":
+			return get_tool_path("llvm/bin/ldc2")
+
+def get_linker():
+	if SANITY_CHECK:	 
+		return get_tool_path("gcc/bin/sh-elf-ld")
+	else:
+		return get_tool_path("llvm/bin/ld.lld") 
+
+def get_lang(file):
+	match Path(file).suffix:
+		case ".c":
+			return "C"
+		case ".cpp":
+			return "C++"
+		case ".d":
+			return "D"
+
 def dump_asm(file):
-	proc = subprocess.run([OBJDUMP_PATH, "-m", "sh4", "--disassemble", "--disassembler-color=extended", file], stdout=subprocess.PIPE, encoding='utf-8')
+	args = [get_tool_path(OBJDUMP_PATH), "-m", "sh4", "--disassemble", "--disassembler-color=extended", file]
+	proc = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8')
 	print(proc.stdout, end='')
+
+def dump_pseudo(file):
+	if SANITY_CHECK:
+		print("Disabled in sanity checking mode...")
+		return
+
+	lang = get_lang(file)
+	cc = get_tool(lang)
+	match lang:
+		case "C":
+			args = [cc, "-nostdlib", "-ffreestanding", "-mllvm=-sh-keep-pseudo", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-S", file, "-o", "-"]
+			proc = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8')
+			print(proc.stdout, end='')
+		case "C++":
+			args = [cc, "-nostdlib", "-ffreestanding", "-mllvm=-sh-keep-pseudo", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-S", file, "-o", "-"]
+			proc = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8')
+			print(proc.stdout, end='')
+		case "D":
+			args = [cc, "-nostdlib", "-ffreestanding", "--sh-keep-pseudo", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "--output-s", file, "-of=-"]
+			proc = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8')
+			print(proc.stdout, end='')
 
 def consume_whitespace(str):
 	return str.strip()
@@ -136,7 +185,8 @@ class Test:
 
 	# The core sheval execution function
 	def exec(self, obj, timeout):
-		proc = subprocess.run([SHEVAL_PATH, obj.name, "-e", self.name], stdout=subprocess.PIPE, timeout=timeout, encoding='utf-8')
+		args = [get_tool_path(SHEVAL_PATH), obj.name, "-m", "sh4l", "-e", self.name]
+		proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout, encoding='utf-8')
 		return proc.stdout.strip()
 
 	# Runs the test, returning true if it succeeded,
@@ -210,7 +260,6 @@ class TestFile:
 
 		return skipc == len(self.tests)
 
-
 	# Compiles a test file.
 	def compile(self):
 		# On Windows, clang, ld.lld and sheval can't open the temporary file while it's
@@ -218,20 +267,39 @@ class TestFile:
 		# it (delete=False), close it straight away, and remove it ourselves afterwards.
 		with tempfile.NamedTemporaryFile(suffix=".o", delete=False) as obj:
 			obj.close()
-			if self.file.endswith(".c"):
-				args = [CLANG_PATH, "-nostdlib", "-ffreestanding", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-c", self.file, "-o", obj.name]
-				if len(LL_DEBUG) != 0:
-					args.append(f"-mllvm={LL_DEBUG}")
+			lang = get_lang(self.file)
+			cc = get_tool(lang)
+			match lang:
+				case "C":
+					if SANITY_CHECK:
+						args = [cc, "-nostdlib", "-ffreestanding", "-m4-single-only", "-ml", "-Iinc/", f"-O{OPT}", "-c", self.file, "-o", obj.name]
+						if len(LL_DEBUG) != 0:
+							args.append(f"-mllvm={LL_DEBUG}")
 
-				res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
-			elif self.file.endswith(".d"):
-				args = [LDC_PATH, "-nostdlib", f"--arch={ARCH}", f"-O{OPT}", "-c", self.file, f"-of={obj.name}"]
-				if len(LL_DEBUG) != 0:
-					args.append(LL_DEBUG)
+						res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
+					else:
+						args = [cc, "-nostdlib", "-ffreestanding", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-c", self.file, "-o", obj.name]
+						if len(LL_DEBUG) != 0:
+							args.append(f"-mllvm={LL_DEBUG}")
 
-				res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
-			else:
-				raise Exception("Unsupported filetype!")
+						res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
+				
+				case "C++":
+					args = [cc, "-nostdlib", "-ffreestanding", "-Iinc/", f"--target={ARCH}", f"-O{OPT}", "-c", self.file, "-o", obj.name]
+					if len(LL_DEBUG) != 0:
+						args.append(f"-mllvm={LL_DEBUG}")
+
+					res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
+
+				case "D":
+					args = [cc, "-nostdlib", f"--arch={ARCH}", f"-O{OPT}", "-c", self.file, f"-of={obj.name}"]
+					if len(LL_DEBUG) != 0:
+						args.append(LL_DEBUG)
+
+					res = subprocess.run(args, timeout=COMPILE_TIMEOUT, capture_output=True, encoding='utf-8')
+
+				case _:
+					raise Exception("Unsupported filetype!")
 
 			if len(res.stdout) != 0 or len(res.stderr) != 0:
 				print_seperator("COMPILER LOG")
@@ -243,7 +311,7 @@ class TestFile:
 			of.close()
 			try:
 				if res.returncode == 0:
-					res = subprocess.run([LD_PATH, "-EL", obj.name, "-o", of.name], capture_output=True, encoding='utf-8')
+					res = subprocess.run([get_linker(), "-EL", obj.name, "-o", of.name], capture_output=True, encoding='utf-8')
 					if res.returncode == 0:
 						return of
 
@@ -286,10 +354,16 @@ class TestFile:
 			res = test.run(obj, TIMEOUT)
 			results[res] += 1
 
-		if (results[TEST_FAIL] > 0 or results[TEST_TIMEOUT] > 0) and DUMP_ASM:
-			print_seperator("ASSEMBLY")
-			dump_asm(obj.name)
+		if DUMP_PSEUDO:
+			print_seperator("PSEUDO ASSEMBLY")
+			dump_pseudo(self.file);
 			print_seperator("")
+		
+		if (results[TEST_FAIL] > 0 or results[TEST_TIMEOUT] > 0):
+			if DUMP_ASM:
+				print_seperator("ASSEMBLY")
+				dump_asm(obj.name)
+				print_seperator("")
 
 		os.remove(obj.name)
 		return results

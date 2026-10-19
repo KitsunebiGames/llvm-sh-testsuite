@@ -1,94 +1,172 @@
 #include "test.h"
 
-NOINLINE int eq(int a, int b) { return a == b; }
-NOINLINE int ne(int a, int b) { return a != b; }
-NOINLINE int gt(int a, int b) { return a > b; }
-NOINLINE int ge(int a, int b) { return a >= b; }
-NOINLINE int lt(int a, int b) { return a < b; }
-NOINLINE int le(int a, int b) { return a <= b; }
-NOINLINE int nz(int a) { return a != 0; }
-NOINLINE int z(int a) { return a == 0; }
-NOINLINE int no(int a) { return a != 1; }
-NOINLINE int o(int a) { return a == 1; }
-NOINLINE int ueq(unsigned a, unsigned b) { return a == b; }
-NOINLINE int une(unsigned a, unsigned b) { return a != b; }
-NOINLINE int ugt(unsigned a, unsigned b) { return a > b; }
-NOINLINE int uge(unsigned a, unsigned b) { return a >= b; }
-NOINLINE int ult(unsigned a, unsigned b) { return a < b; }
-NOINLINE int ule(unsigned a, unsigned b) { return a <= b; }
+NOINLINE int i32_eq(int a, int b) { return a == b; }
+NOINLINE int i32_ne(int a, int b) { return a != b; }
+NOINLINE int i32_gt(int a, int b) { return a > b; }
+NOINLINE int i32_ge(int a, int b) { return a >= b; }
+NOINLINE int i32_lt(int a, int b) { return a < b; }
+NOINLINE int i32_le(int a, int b) { return a <= b; }
+NOINLINE int i32_nz(int a) { return a != 0; }
+NOINLINE int i32_no(int a) { return a != 1; }
+NOINLINE int  i32_z(int a) { return a == 0; }
+NOINLINE int  i32_o(int a) { return a == 1; }
 
-int test_eq1() { return eq(24, 24); }
-int test_eq2() { return eq(21, 42); }
-int test_ne1() { return ne(21, 42); }
-int test_ne2() { return ne(24, 24); }
-int test_gt1() { return gt(2, 0); }
-int test_gt2() { return gt(0, 2); }
-int test_ge1() { return ge(2, 2); }
-int test_ge2() { return ge(3, 2); }
-int test_ge3() { return ge(1, 2); }
-int test_lt1() { return lt(0, 2); }
-int test_lt2() { return lt(2, 0); }
-int test_le1() { return le(2, 2); }
-int test_le2() { return le(1, 2); }
-int test_le3() { return le(3, 2); }
-int test_z1() { return z(0); }
-int test_z2() { return z(1); }
-int test_nz1() { return nz(1); }
-int test_nz2() { return nz(0); }
+int i32_eq1() { return i32_eq(24, 24); }
+int i32_eq2() { return i32_eq(21, 42); }
+int i32_ne1() { return i32_ne(21, 42); }
+int i32_ne2() { return i32_ne(24, 24); }
+int i32_gt1() { return i32_gt(2, 0); }
+int i32_gt2() { return i32_gt(0, 2); }
+int i32_ge1() { return i32_ge(2, 2); }
+int i32_ge2() { return i32_ge(3, 2); }
+int i32_ge3() { return i32_ge(1, 2); }
+int i32_lt1() { return i32_lt(0, 2); }
+int i32_lt2() { return i32_lt(2, 0); }
+int i32_le1() { return i32_le(2, 2); }
+int i32_le2() { return i32_le(1, 2); }
+int i32_le3() { return i32_le(3, 2); }
+int i32_nz1() { return i32_nz(1); }
+int i32_nz2() { return i32_nz(0); }
+int i32_no1() { return i32_no(0); }
+int i32_no2() { return i32_no(1); }
+int i32_z1()  { return i32_z(0); }
+int i32_z2()  { return i32_z(1); }
+int i32_o1()  { return i32_o(1); }
+int i32_o2()  { return i32_o(0); }
 
-int test_ueq1() { return ueq(1, 1); }
-int test_ueq2() { return ueq(0, 1); }
-int test_une1() { return une(1, 0); }
-int test_une2() { return une(1, 1); }
-int test_ugt1() { return ugt(1, 0); }
-int test_ugt2() { return ugt(0, 1); }
-int test_uge1() { return uge(1, 0); }
-int test_uge2() { return uge(1, 1); }
-int test_uge3() { return uge(0, 1); }
-int test_ult1() { return ult(1, 2); }
-int test_ult2() { return ult(2, 1); }
-int test_ule1() { return ule(1, 2); }
-int test_ule2() { return ule(2, 2); }
-int test_ule3() { return ule(2, 1); }
-int test_o1() { return o(1); }
-int test_o2() { return o(0); }
-int test_no1() { return no(0); }
-int test_no2() { return no(1); }
+// RUN: i32_eq1 = 1
+// RUN: i32_eq2 = 0
+// RUN: i32_ne1 = 1
+// RUN: i32_ne2 = 0
+// RUN: i32_gt1 = 1
+// RUN: i32_gt2 = 0
+// RUN: i32_ge1 = 1
+// RUN: i32_ge2 = 1
+// RUN: i32_ge3 = 0
+// RUN: i32_lt1 = 1
+// RUN: i32_lt2 = 0
+// RUN: i32_le1 = 1
+// RUN: i32_le2 = 1
+// RUN: i32_le3 = 0
+// RUN: i32_nz1 = 1
+// RUN: i32_nz2 = 0
+// RUN: i32_no1 = 1
+// RUN: i32_no2 = 0
+// RUN: i32_z1 = 1
+// RUN: i32_z2 = 0
+// RUN: i32_o1 = 1
+// RUN: i32_o2 = 0
 
-// RUN: test_eq1 = 1
-// RUN: test_eq2 = 0
-// RUN: test_ne1 = 1
-// RUN: test_ne2 = 0
-// RUN: test_gt1 = 1
-// RUN: test_gt2 = 0
-// RUN: test_ge1 = 1
-// RUN: test_ge2 = 1
-// RUN: test_ge3 = 0
-// RUN: test_lt1 = 1
-// RUN: test_lt2 = 0
-// RUN: test_le1 = 1
-// RUN: test_le2 = 1
-// RUN: test_le3 = 0
-// RUN: test_z1 = 1
-// RUN: test_z2 = 0
-// RUN: test_nz1 = 1
-// RUN: test_nz2 = 0
+NOINLINE int i16_eq(short a, short b) { return a == b; }
+NOINLINE int i16_ne(short a, short b) { return a != b; }
+NOINLINE int i16_gt(short a, short b) { return a > b; }
+NOINLINE int i16_ge(short a, short b) { return a >= b; }
+NOINLINE int i16_lt(short a, short b) { return a < b; }
+NOINLINE int i16_le(short a, short b) { return a <= b; }
+NOINLINE int i16_nz(short a) { return a != 0; }
+NOINLINE int i16_no(short a) { return a != 1; }
+NOINLINE int  i16_z(short a) { return a == 0; }
+NOINLINE int  i16_o(short a) { return a == 1; }
 
-// RUN: test_ueq1 = 1
-// RUN: test_ueq2 = 0
-// RUN: test_une1 = 1
-// RUN: test_une2 = 0
-// RUN: test_ugt1 = 1
-// RUN: test_ugt2 = 0
-// RUN: test_uge1 = 1
-// RUN: test_uge2 = 1
-// RUN: test_uge3 = 0
-// RUN: test_ult1 = 1
-// RUN: test_ult2 = 0
-// RUN: test_ule1 = 1
-// RUN: test_ule2 = 1
-// RUN: test_ule3 = 0
-// RUN: test_o1 = 1
-// RUN: test_o2 = 0
-// RUN: test_no1 = 1
-// RUN: test_no2 = 0
+int i16_eq1() { return i16_eq(24, 24); }
+int i16_eq2() { return i16_eq(21, 42); }
+int i16_ne1() { return i16_ne(21, 42); }
+int i16_ne2() { return i16_ne(24, 24); }
+int i16_gt1() { return i16_gt(2, 0); }
+int i16_gt2() { return i16_gt(0, 2); }
+int i16_ge1() { return i16_ge(2, 2); }
+int i16_ge2() { return i16_ge(3, 2); }
+int i16_ge3() { return i16_ge(1, 2); }
+int i16_lt1() { return i16_lt(0, 2); }
+int i16_lt2() { return i16_lt(2, 0); }
+int i16_le1() { return i16_le(2, 2); }
+int i16_le2() { return i16_le(1, 2); }
+int i16_le3() { return i16_le(3, 2); }
+int i16_nz1() { return i16_nz(1); }
+int i16_nz2() { return i16_nz(0); }
+int i16_no1() { return i16_no(0); }
+int i16_no2() { return i16_no(1); }
+int i16_z1()  { return i16_z(0); }
+int i16_z2()  { return i16_z(1); }
+int i16_o1()  { return i16_o(1); }
+int i16_o2()  { return i16_o(0); }
+
+// RUN: i16_eq1 = 1
+// RUN: i16_eq2 = 0
+// RUN: i16_ne1 = 1
+// RUN: i16_ne2 = 0
+// RUN: i16_gt1 = 1
+// RUN: i16_gt2 = 0
+// RUN: i16_ge1 = 1
+// RUN: i16_ge2 = 1
+// RUN: i16_ge3 = 0
+// RUN: i16_lt1 = 1
+// RUN: i16_lt2 = 0
+// RUN: i16_le1 = 1
+// RUN: i16_le2 = 1
+// RUN: i16_le3 = 0
+// RUN: i16_nz1 = 1
+// RUN: i16_nz2 = 0
+// RUN: i16_no1 = 1
+// RUN: i16_no2 = 0
+// RUN: i16_z1 = 1
+// RUN: i16_z2 = 0
+// RUN: i16_o1 = 1
+// RUN: i16_o2 = 0
+
+NOINLINE int i8_eq(char a, char b) { return a == b; }
+NOINLINE int i8_ne(char a, char b) { return a != b; }
+NOINLINE int i8_gt(char a, char b) { return a > b; }
+NOINLINE int i8_ge(char a, char b) { return a >= b; }
+NOINLINE int i8_lt(char a, char b) { return a < b; }
+NOINLINE int i8_le(char a, char b) { return a <= b; }
+NOINLINE int i8_nz(char a) { return a != 0; }
+NOINLINE int i8_no(char a) { return a != 1; }
+NOINLINE int  i8_z(char a) { return a == 0; }
+NOINLINE int  i8_o(char a) { return a == 1; }
+
+int i8_eq1() { return i8_eq(24, 24); }
+int i8_eq2() { return i8_eq(21, 42); }
+int i8_ne1() { return i8_ne(21, 42); }
+int i8_ne2() { return i8_ne(24, 24); }
+int i8_gt1() { return i8_gt(2, 0); }
+int i8_gt2() { return i8_gt(0, 2); }
+int i8_ge1() { return i8_ge(2, 2); }
+int i8_ge2() { return i8_ge(3, 2); }
+int i8_ge3() { return i8_ge(1, 2); }
+int i8_lt1() { return i8_lt(0, 2); }
+int i8_lt2() { return i8_lt(2, 0); }
+int i8_le1() { return i8_le(2, 2); }
+int i8_le2() { return i8_le(1, 2); }
+int i8_le3() { return i8_le(3, 2); }
+int i8_nz1() { return i8_nz(1); }
+int i8_nz2() { return i8_nz(0); }
+int i8_no1() { return i8_no(0); }
+int i8_no2() { return i8_no(1); }
+int i8_z1()  { return i8_z(0); }
+int i8_z2()  { return i8_z(1); }
+int i8_o1()  { return i8_o(1); }
+int i8_o2()  { return i8_o(0); }
+
+// RUN: i8_eq1 = 1
+// RUN: i8_eq2 = 0
+// RUN: i8_ne1 = 1
+// RUN: i8_ne2 = 0
+// RUN: i8_gt1 = 1
+// RUN: i8_gt2 = 0
+// RUN: i8_ge1 = 1
+// RUN: i8_ge2 = 1
+// RUN: i8_ge3 = 0
+// RUN: i8_lt1 = 1
+// RUN: i8_lt2 = 0
+// RUN: i8_le1 = 1
+// RUN: i8_le2 = 1
+// RUN: i8_le3 = 0
+// RUN: i8_nz1 = 1
+// RUN: i8_nz2 = 0
+// RUN: i8_no1 = 1
+// RUN: i8_no2 = 0
+// RUN: i8_z1 = 1
+// RUN: i8_z2 = 0
+// RUN: i8_o1 = 1
+// RUN: i8_o2 = 0
